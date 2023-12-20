@@ -1,4 +1,4 @@
-import {Message, Role} from './Chat'
+import {Message, Role} from '../redux/chat_slice'
 
 interface ChatBubbleProps {
 	message: Message

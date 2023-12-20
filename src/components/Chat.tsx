@@ -1,36 +1,33 @@
-import {ChangeEventHandler, useEffect, useRef, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import ChatBubble from './ChatBubble'
-
-export enum Role {
-	SYSTEM = 'system',
-	USER = 'user',
-	ASSISTANT = 'assistant',
-}
-
-export type Message = {
-	id: number
-	content: string
-	role: Role
-	timestamp: string
-}
+import {ASSISTANT_PRESET, Message, Role, addMessage} from '../redux/chat_slice'
+import {useDispatch, useSelector} from 'react-redux'
+import {RootState} from '../redux/store'
 
 const Chat = () => {
 	const [message, setMessage] = useState('')
 
 	const [aiLoading, setAiLoading] = useState<boolean>(false)
 	const [firstMessageSent, setFirstMessageSent] = useState(false)
-	const [messageList, setMessageList] = useState<Message[]>([])
+	const messageSlice = useSelector(
+		(state: RootState) => state.rootReducer.message.messages
+	)
+
+	const [messageListState, setMessageListState] = useState<Message[]>(
+		messageSlice ?? []
+	)
+
+	const dispatch = useDispatch()
 
 	const messageListRef = useRef<HTMLDivElement>(null)
 
 	useEffect(() => {
-		if (!messageList || messageList.length === 0) {
-			if (messageList.length === 0) {
+		if (!messageListState || messageListState.length === 0) {
+			if (messageListState.length === 0) {
 				sendMessage([
 					{
 						id: 0,
-						content:
-							'You are my pen pal! Your name is Jax Pen. When starting a conversation, write a small message not exceeding 100 characters. Use emojis whenever appropriate to express your emotions.',
+						content: ASSISTANT_PRESET,
 						role: Role.SYSTEM,
 						timestamp: Date.now().toString(),
 					},
@@ -43,79 +40,7 @@ const Chat = () => {
 				setFirstMessageSent(true)
 			}
 		}
-	}, [messageList])
-
-	async function sendMessage(messages: Message[]) {
-		setAiLoading(true)
-		const response = await fetch('http://localhost:3100/stream', {
-			method: 'POST',
-			headers: {'Content-Type': 'application/json'},
-			body: JSON.stringify({messages}),
-		})
-		if (!response.ok || !response.body) {
-			console.log('error')
-			return
-		}
-
-		const reader = response.body.getReader()
-		const decoder = new TextDecoder()
-
-		const timestamp = Date.now().toString()
-
-		let messageText = ''
-
-		while (true) {
-			const {done, value} = await reader.read()
-			if (done) {
-				break
-			}
-
-			const token = decoder.decode(value)
-
-			messageText += token
-
-			setMessageList((messages) => {
-				const lastMessage = messages[messages.length - 1]!
-				if (!lastMessage) {
-					return [
-						{
-							id: 0,
-							role: Role.ASSISTANT,
-							content: token,
-							timestamp,
-						},
-					]
-				}
-
-				if (lastMessage.role !== Role.ASSISTANT) {
-					return [
-						...messages,
-						{
-							id: 0,
-							role: Role.ASSISTANT,
-							content: token,
-							timestamp,
-						},
-					]
-				}
-
-				const content = lastMessage.content + token
-				return [
-					...messages.slice(0, messages.length - 1),
-					{id: 0, role: Role.ASSISTANT, content, timestamp},
-				]
-			})
-		}
-
-		const newMessage: Message = {
-			id: 0,
-			role: Role.ASSISTANT,
-			content: messageText,
-			timestamp: Date.now().toString(),
-		}
-
-		setAiLoading(false)
-	}
+	}, [messageListState])
 
 	useEffect(() => {
 		setTimeout(() => {
@@ -124,7 +49,86 @@ const Chat = () => {
 				block: 'end',
 			})
 		}, 200)
-	}, [messageList])
+	}, [messageListState])
+
+	async function sendMessage(messages: Message[]) {
+		try {
+			setAiLoading(true)
+			const response = await fetch('http://localhost:3100/stream', {
+				method: 'POST',
+				headers: {'Content-Type': 'application/json'},
+				body: JSON.stringify({messages}),
+			})
+			if (!response.ok || !response.body) {
+				console.log('error')
+				return
+			}
+
+			const reader = response.body.getReader()
+			const decoder = new TextDecoder()
+
+			const timestamp = Date.now().toString()
+
+			let messageText = ''
+
+			while (true) {
+				const {done, value} = await reader.read()
+				if (done) {
+					break
+				}
+
+				const token = decoder.decode(value)
+
+				messageText += token
+
+				setMessageListState((messages) => {
+					const lastMessage = messages[messages.length - 1]!
+					if (!lastMessage) {
+						return [
+							{
+								id: 0,
+								role: Role.ASSISTANT,
+								content: token,
+								timestamp,
+							},
+						]
+					}
+
+					if (lastMessage.role !== Role.ASSISTANT) {
+						return [
+							...messages,
+							{
+								id: 0,
+								role: Role.ASSISTANT,
+								content: token,
+								timestamp,
+							},
+						]
+					}
+
+					const content = lastMessage.content + token
+					return [
+						...messages.slice(0, messages.length - 1),
+						{id: 0, role: Role.ASSISTANT, content, timestamp},
+					]
+				})
+			}
+
+			const newMessage: Message = {
+				id: 0,
+				role: Role.ASSISTANT,
+				content: messageText,
+				timestamp: Date.now().toString(),
+			}
+
+			dispatch(addMessage(newMessage) as any)
+
+			setAiLoading(false)
+		} catch (error) {
+			console.log(error)
+			setAiLoading(false)
+		}
+	}
 
 	const handleSend = () => {
 		const newMessage: Message = {
@@ -133,8 +137,9 @@ const Chat = () => {
 			content: message,
 			timestamp: Date.now().toString(),
 		}
-		const updatedMessages = [...messageList, newMessage]
-		setMessageList(updatedMessages)
+		const updatedMessages = [...messageListState, newMessage]
+		setMessageListState(updatedMessages)
+		dispatch(addMessage(newMessage) as any)
 		setMessage('')
 		sendMessage(updatedMessages)
 	}
@@ -144,8 +149,8 @@ const Chat = () => {
 			<div
 				className='flex flex-col flex-1 overflow-y-auto p-4'
 				ref={messageListRef}>
-				{messageList.map(
-					(message) =>
+				{messageListState.map(
+					(message: Message) =>
 						message && (
 							<ChatBubble
 								key={message.timestamp}
