@@ -24,14 +24,14 @@ const Chat = () => {
 	useEffect(() => {
 		if (!messageListState || messageListState.length === 0) {
 			if (messageListState.length === 0) {
-				sendMessage([
-					{
-						id: 0,
-						content: ASSISTANT_PRESET,
-						role: Role.SYSTEM,
-						timestamp: Date.now().toString(),
-					},
-				])
+				const assistantPresetMessage = {
+					id: 0,
+					content: ASSISTANT_PRESET,
+					role: Role.SYSTEM,
+					timestamp: Date.now().toString(),
+				}
+				sendMessage([assistantPresetMessage])
+				dispatch(addMessage(assistantPresetMessage) as any)
 			}
 		}
 
