@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: react-chat-deployment
+    labels:
+        app: react-chat
+spec:
+    replicas: 2
+    selector:
+        matchLabels:
+            app: react-chat
+    template:
+        metadata:
+            labels:
+                app: react-chat
+        spec:
+            containers:
+                - name: react-chat-container
+                  image: adityaku1997/react-chat:1.0.2
+                  imagePullPolicy: 'Always'
+                  ports:
+                      - containerPort: 3000
+            imagePullSecrets:
+                - name: ocirsecret
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: react-chat-service
+spec:
+    selector:
+        app: react-chat
+    type: ClusterIP
+    ports:
+        - name: http
+          protocol: TCP
+          port: 80
+          targetPort: 3000

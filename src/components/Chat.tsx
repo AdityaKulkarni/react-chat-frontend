@@ -8,7 +8,6 @@ const Chat = () => {
 	const [message, setMessage] = useState('')
 
 	const [aiLoading, setAiLoading] = useState<boolean>(false)
-	const [firstMessageSent, setFirstMessageSent] = useState(false)
 	const messageSlice = useSelector(
 		(state: RootState) => state.rootReducer.message.messages
 	)
@@ -34,12 +33,6 @@ const Chat = () => {
 				dispatch(addMessage(assistantPresetMessage) as any)
 			}
 		}
-
-		return () => {
-			if (!firstMessageSent) {
-				setFirstMessageSent(true)
-			}
-		}
 	}, [messageListState])
 
 	useEffect(() => {
@@ -54,7 +47,7 @@ const Chat = () => {
 	async function sendMessage(messages: Message[]) {
 		try {
 			setAiLoading(true)
-			const response = await fetch('http://localhost:3100/stream', {
+			const response = await fetch('http://127.0.0.1/stream', {
 				method: 'POST',
 				headers: {'Content-Type': 'application/json'},
 				body: JSON.stringify({messages}),
@@ -149,15 +142,17 @@ const Chat = () => {
 			<div
 				className='flex flex-col flex-1 overflow-y-auto p-4'
 				ref={messageListRef}>
-				{messageListState.map(
-					(message: Message) =>
-						message && (
-							<ChatBubble
-								key={message.timestamp}
-								message={message}
-							/>
-						)
-				)}
+				{messageListState
+					.filter((message) => message.role !== Role.SYSTEM)
+					.map(
+						(message: Message) =>
+							message && (
+								<ChatBubble
+									key={message.timestamp}
+									message={message}
+								/>
+							)
+					)}
 			</div>
 			<div className='flex flex-row bg-blue-100'>
 				<input
